@@ -86,15 +86,25 @@
 	function downloadText(text, name) {
 		const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
 		const blobUrl = URL.createObjectURL(blob);
-		GM_download({
-			url: blobUrl,
-			name,
-			saveAs: false,
-			onerror(error) {
-				console.warn('[Super-Copie] Téléchargement impossible', name, error);
-			},
-			onload() {
+		return new Promise((resolve, reject) => {
+			try {
+				GM_download({
+					url: blobUrl,
+					name,
+					saveAs: false,
+					onerror(error) {
+						URL.revokeObjectURL(blobUrl);
+						console.warn('[Super-Copie] Téléchargement impossible', name, error);
+						reject(new Error(`Téléchargement refusé pour ${name}`));
+					},
+					onload() {
+						URL.revokeObjectURL(blobUrl);
+						resolve();
+					}
+				});
+			} catch (error) {
 				URL.revokeObjectURL(blobUrl);
+				reject(error);
 			}
 		});
 	}
@@ -150,7 +160,15 @@
 		button.querySelector('span').textContent = 'Copie en cours...';
 
 		const folder = pageFolder();
-		downloadText(`<!doctype html>\n${document.documentElement.outerHTML}`, `${folder}/index.html`);
+		try {
+			await downloadText(`<!doctype html>\n${document.documentElement.outerHTML}`, `${folder}/index.html`);
+		} catch (error) {
+			setStatus(`Échec du téléchargement : ${error.message}`);
+			button.disabled = false;
+			button.querySelector('span').textContent = button.dataset.label;
+			isRunning = false;
+			return;
+		}
 		const candidates = collectLinks().slice(0, MAX_REDIRECTS);
 		let redirects = 0;
 		let ignored = collectLinks().length - candidates.length;
@@ -168,8 +186,13 @@
 				continue;
 			}
 			const redirectedFolder = `${folder}/redirections`;
-			downloadText(`<!doctype html>\n${response.responseText}`, `${redirectedFolder}/${fileName(finalUrl, `redirect-${redirects + 1}`)}`);
-			redirects += 1;
+			try {
+				await downloadText(`<!doctype html>\n${response.responseText}`, `${redirectedFolder}/${fileName(finalUrl, `redirect-${redirects + 1}`)}`);
+				redirects += 1;
+			} catch (error) {
+				ignored += 1;
+				console.warn('[Super-Copie] Redirection non téléchargée', finalUrl, error);
+			}
 			setStatus(`Page enregistrée. ${redirects} redirection(s) trouvée(s)...`);
 		}
 
