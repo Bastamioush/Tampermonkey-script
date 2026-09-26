@@ -15,6 +15,7 @@ Collection de scripts utilisateur pour [Tampermonkey](https://www.tampermonkey.n
    - [Explain-Userscript.js](Explain-Userscript.js)
    - [quest-ce-que-cest.user.js](quest-ce-que-cest.user.js)
    - [Super-Copie.js](Super-Copie.js)
+    - [Refus-Cookies.user.js](Refus-Cookies.user.js)
 2. Cliquez sur **Raw** en haut à droite de la page GitHub.
 3. Tampermonkey devrait proposer l'installation du script. Cliquez sur **Installer**.
 4. Si la fenêtre d'installation ne s'ouvre pas, copiez l'URL de la page Raw, ouvrez le tableau de bord Tampermonkey, choisissez **Utilitaires**, puis utilisez l'importation depuis une URL.
@@ -24,7 +25,7 @@ Pour installer une version locale, ouvrez le fichier `.js` dans VS Code, copiez 
 
 ### 3. Vérifier l'activation
 
-Dans le tableau de bord Tampermonkey, vérifiez que l'interrupteur du script est activé. Les trois scripts ciblent les pages HTTP et HTTPS avec `@match *://*/*`, mais chacun n'affiche son interface que lorsqu'il est nécessaire.
+Dans le tableau de bord Tampermonkey, vérifiez que l'interrupteur du script est activé. Les scripts ciblent les pages HTTP et HTTPS avec `@match *://*/*`, mais chacun n'affiche son interface que lorsqu'il est nécessaire.
 
 ## Vue d'ensemble
 
@@ -33,6 +34,7 @@ Dans le tableau de bord Tampermonkey, vérifiez que l'interrupteur du script est
 | `Explain-Userscript.js` | Simplifier un passage sélectionné avec une API compatible OpenAI | Sélectionner du texte, puis cliquer sur le bouton d'explication |
 | `quest-ce-que-cest.user.js` | Inspecter rapidement un élément HTML | Maintenir `Alt` et survoler un élément |
 | `Super-Copie.js` | Télécharger la page actuelle et certaines pages redirigées | Cliquer sur **Télécharger cette page** |
+| `Refus-Cookies.user.js` | Refuser les cookies non nécessaires et masquer certains bandeaux | Automatique au chargement de la page |
 
 ## Explain-Userscript.js
 
@@ -170,6 +172,22 @@ Le titre est nettoyé pour former un nom de dossier compatible avec le système 
 - Les pages nécessitant une authentification, bloquant les requêtes externes ou renvoyant une erreur peuvent être ignorées.
 - Une seule exécution à la fois est autorisée et 30 redirections au maximum sont analysées.
 
+## Refus-Cookies.user.js
+
+### Utilité
+
+Le script cherche les commandes explicites de refus des cookies non nécessaires, y compris dans les préférences du bandeau, et les active automatiquement. Il reconnaît des libellés courants en français et en anglais.
+
+Si un bandeau connu reste affiché sans choix de refus détectable, le script le masque après un court délai. Ce masquage est uniquement visuel : il ne constitue pas un refus de consentement et ne contourne pas une page que le site bloque côté serveur. Le script ne clique jamais sur **Accepter**.
+
+### Limites
+
+La détection repose sur les commandes accessibles et quelques conteneurs de bandeaux courants. Les interfaces intégrées dans des iframes d'un autre domaine, les textes inhabituels et les scripts anti-automatisation peuvent empêcher le refus automatique. Vérifiez les réglages de confidentialité du site si un refus doit être enregistré.
+
+### Autorisations
+
+Le script utilise `@grant none` et ne demande aucune permission Tampermonkey particulière.
+
 ## Permissions Tampermonkey
 
 Les permissions sont déclarées dans l'en-tête de chaque script avec les directives `@grant`, `@connect` et `@resource`.
@@ -182,7 +200,7 @@ Les permissions sont déclarées dans l'en-tête de chaque script avec les direc
 | `@connect api.openai.com` | `Explain-Userscript.js` | Autoriser l'API OpenAI |
 | `@connect localhost`, `127.0.0.1` | `Explain-Userscript.js` | Autoriser un service local compatible |
 | `@connect *` | `Super-Copie.js` | Autoriser la vérification de liens sur différents domaines |
-| `@grant none` | `quest-ce-que-cest.user.js` | Utiliser uniquement les API normales du navigateur |
+| `@grant none` | `quest-ce-que-cest.user.js`, `Refus-Cookies.user.js` | Utiliser uniquement les API normales du navigateur |
 
 ## Compatibilité et dépannage
 
