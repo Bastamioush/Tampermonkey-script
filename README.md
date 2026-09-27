@@ -16,6 +16,7 @@ Collection de scripts utilisateur pour [Tampermonkey](https://www.tampermonkey.n
    - [quest-ce-que-cest.user.js](quest-ce-que-cest.user.js)
    - [Super-Copie.js](Super-Copie.js)
     - [Refus-Cookies.user.js](Refus-Cookies.user.js)
+    - [Paint-Page.js](Paint-Page.js)
 2. Cliquez sur **Raw** en haut à droite de la page GitHub.
 3. Tampermonkey devrait proposer l'installation du script. Cliquez sur **Installer**.
 4. Si la fenêtre d'installation ne s'ouvre pas, copiez l'URL de la page Raw, ouvrez le tableau de bord Tampermonkey, choisissez **Utilitaires**, puis utilisez l'importation depuis une URL.
@@ -35,6 +36,19 @@ Dans le tableau de bord Tampermonkey, vérifiez que l'interrupteur du script est
 | `quest-ce-que-cest.user.js` | Inspecter rapidement un élément HTML | Maintenir `Alt` et survoler un élément |
 | `Super-Copie.js` | Télécharger la page actuelle et certaines pages redirigées | Cliquer sur **Télécharger cette page** |
 | `Refus-Cookies.user.js` | Refuser les cookies non nécessaires et masquer certains bandeaux | Automatique au chargement de la page |
+| `Paint-Page.js` | Surligner du texte et ajouter des formes à une page | Ouvrir le bouton crayon en bas à droite |
+
+## Paint-Page.js
+
+### Utilisation
+
+1. Ouvrez le bouton crayon en bas à droite de la page.
+2. Choisissez une couleur dans la palette ou ouvrez le sélecteur de couleur.
+3. Pour surligner, sélectionnez un passage puis cliquez sur **Surligner**.
+4. Pour dessiner, choisissez le rectangle, l’ellipse ou la flèche, puis cliquez-glissez sur la page.
+5. Cliquez sur **Annuler** pour retirer la dernière annotation.
+
+Les annotations sont sauvegardées dans le stockage local du navigateur pour l’adresse de la page. Les surlignages sont retrouvés à partir du texte sélectionné et de son contexte ; les formes gardent leur position sur la page. Le script utilise `@grant none` et ne demande aucune permission Tampermonkey particulière.
 
 ## Explain-Userscript.js
 
