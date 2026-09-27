@@ -25,13 +25,14 @@
 		host: null,
 		panel: null,
 		svg: null,
+		layer: null,
 		status: null
 	};
 
 	function loadAnnotations() {
 		try {
 			const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-			return Array.isArray(saved) ? saved.filter((item) => item && ['highlight', 'rect', 'ellipse', 'arrow'].includes(item.type)) : [];
+			return Array.isArray(saved) ? saved.filter((item) => item && ['highlight', 'rect', 'ellipse', 'arrow', 'note', 'link'].includes(item.type)) : [];
 		} catch (_) {
 			return [];
 		}
@@ -159,14 +160,16 @@
 	function renderAnnotations() {
 		if (!state.svg) return;
 		state.svg.replaceChildren();
+		state.layer.replaceChildren();
 		state.svg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
-		const { text, entries } = pageText();
+		const hasHighlights = state.annotations.some((annotation) => annotation.type === 'highlight');
+		const page = hasHighlights ? pageText() : null;
 		const scrollX = window.scrollX;
 		const scrollY = window.scrollY;
 
 		state.annotations.forEach((annotation) => {
 			if (annotation.type === 'highlight') {
-				const range = locateHighlight(annotation, text, entries);
+				const range = locateHighlight(annotation, page.text, page.entries);
 				if (!range) return;
 				[...range.getClientRects()].forEach((rect) => {
 					state.svg.append(svgElement('rect', {
@@ -174,6 +177,23 @@
 						rx: 2, fill: annotation.color, 'fill-opacity': 0.46
 					}));
 				});
+				return;
+			}
+			if (annotation.type === 'note' || annotation.type === 'link') {
+				const item = annotation.type === 'note' ? document.createElement('div') : document.createElement('a');
+				item.textContent = annotation.type === 'note' ? annotation.text : annotation.label;
+				if (annotation.type === 'link') {
+					const url = safeLink(annotation.href);
+					if (!url) return;
+					item.href = url.href;
+					item.target = '_blank';
+					item.rel = 'noopener noreferrer';
+					item.title = url.href;
+					item.style.pointerEvents = 'auto';
+					item.style.textDecoration = 'underline';
+				}
+				item.style.cssText += `;position:fixed;left:${Number(annotation.x1) - scrollX}px;top:${Number(annotation.y1) - scrollY}px;max-width:260px;padding:5px 8px;border:1px solid ${annotation.color};border-radius:4px;background:${annotation.color};color:#17221d;font:600 13px/1.35 "Segoe UI",sans-serif;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 2px 8px #0003;`;
+				state.layer.append(item);
 				return;
 			}
 
@@ -205,7 +225,24 @@
 			button.setAttribute('aria-pressed', String(button.dataset.mode === mode));
 		});
 		state.host.dataset.drawing = String(mode !== 'highlight');
-		setStatus(mode === 'highlight' ? 'Sélectionnez un passage, puis cliquez sur Surligner.' : 'Cliquez-glissez sur la page pour tracer.');
+		state.panel.querySelector('[data-placement]').hidden = !['note', 'link'].includes(mode);
+		state.panel.querySelector('[data-note-fields]').hidden = mode !== 'note';
+		state.panel.querySelector('[data-link-fields]').hidden = mode !== 'link';
+		const messages = {
+			highlight: 'Sélectionnez un passage, puis cliquez sur Surligner.',
+			note: 'Saisissez votre note, puis cliquez à son emplacement.',
+			link: 'Saisissez une URL, puis cliquez où placer le lien.'
+		};
+		setStatus(messages[mode] || 'Cliquez-glissez sur la page pour tracer.');
+	}
+
+	function safeLink(value) {
+		try {
+			const url = new URL(value);
+			return ['http:', 'https:'].includes(url.protocol) ? url : null;
+		} catch (_) {
+			return null;
+		}
 	}
 
 	function makeInterface() {
@@ -227,13 +264,16 @@
 				.close { width: 28px; height: 28px; border-radius: 6px; font-size: 18px; }
 				.close:hover, .tool:hover, .action:hover { background: #39443f; }
 				.label { display:block; margin: 10px 0 6px; color: #aebbb4; font-size: 11px; font-weight: 600; }
-				.tools { display:grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+				.tools { display:grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 				.tool { min-height: 40px; border: 1px solid #46514d; border-radius: 6px; background: #29322e; font-size: 16px; }
 				.tool[aria-pressed="true"] { border-color: #8ce0bd; color: #a8f0d2; background: #30473d; }
 				.colors { display:flex; align-items:center; gap: 8px; }
 				.swatch { width: 25px; height: 25px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: var(--swatch); }
 				.swatch[aria-pressed="true"] { outline: 2px solid #f4f6f5; outline-offset: 2px; }
 				input[type="color"] { width: 30px; height: 30px; padding: 2px; border: 1px solid #66726c; border-radius: 6px; background: #29322e; cursor: pointer; }
+				.placement[hidden], .placement-fields[hidden] { display:none; }
+				.placement input { width:100%; min-height:34px; padding:6px 8px; border:1px solid #46514d; border-radius:5px; color:#f4f6f5; background:#29322e; font:inherit; }
+				.placement input + input { margin-top:6px; }
 				.actions { display:flex; gap: 7px; margin-top: 13px; }
 				.action { flex: 1; min-height: 36px; border: 1px solid #46514d; border-radius: 6px; background: #29322e; }
 				.primary { border-color: #83cdb0; color: #17251e; background: #8ce0bd; font-weight: 700; }
@@ -251,6 +291,20 @@
 						<button class="tool" type="button" data-mode="rect" aria-label="Rectangle" title="Rectangle" aria-pressed="false">□</button>
 						<button class="tool" type="button" data-mode="ellipse" aria-label="Ellipse" title="Ellipse" aria-pressed="false">○</button>
 						<button class="tool" type="button" data-mode="arrow" aria-label="Flèche" title="Flèche" aria-pressed="false">↗</button>
+						<button class="tool" type="button" data-mode="note" aria-label="Ajouter une annotation texte" title="Annotation texte" aria-pressed="false">Aa</button>
+						<button class="tool" type="button" data-mode="link" aria-label="Ajouter un lien" title="Lien cliquable" aria-pressed="false">URL</button>
+					</div>
+					<div class="placement" data-placement hidden>
+						<div class="placement-fields" data-note-fields hidden>
+							<label class="label" for="paint-page-note">Annotation</label>
+							<input id="paint-page-note" data-note-text maxlength="500" placeholder="Votre annotation">
+						</div>
+						<div class="placement-fields" data-link-fields hidden>
+							<label class="label" for="paint-page-url">Adresse du lien</label>
+							<input id="paint-page-url" data-link-url type="url" placeholder="https://exemple.fr">
+							<label class="label" for="paint-page-link-label">Texte affiché</label>
+							<input id="paint-page-link-label" data-link-label maxlength="120" placeholder="Ouvrir le lien">
+						</div>
 					</div>
 					<span class="label">Couleur</span>
 					<div class="colors" role="group" aria-label="Choisir une couleur"></div>
@@ -285,7 +339,7 @@
 
 		shadow.querySelector('.launcher').addEventListener('click', () => {
 			state.panel.hidden = !state.panel.hidden;
-			if (!state.panel.hidden) setStatus('Sélectionnez un passage, puis cliquez sur Surligner.');
+			if (!state.panel.hidden) setMode(state.mode);
 		});
 		shadow.querySelector('.close').addEventListener('click', () => { state.panel.hidden = true; });
 		shadow.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => setMode(button.dataset.mode)));
@@ -313,15 +367,19 @@
 		state.svg.setAttribute('aria-hidden', 'true');
 		state.svg.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;overflow:visible;pointer-events:none;z-index:2147483645;';
 		document.documentElement.append(state.svg);
+		state.layer = document.createElement('div');
+		state.layer.id = `${HOST_ID}_items`;
+		state.layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483645;';
+		document.documentElement.append(state.layer);
 
 		document.addEventListener('pointerdown', (event) => {
-			if (state.mode === 'highlight' || event.button !== 0 || state.host.contains(event.target)) return;
-			state.drawing = { x1: event.pageX, y1: event.pageY, x2: event.pageX, y2: event.pageY };
+			if (state.mode === 'highlight' || event.button !== 0 || state.host.contains(event.target) || state.layer.contains(event.target)) return;
+			state.drawing = { x1: event.pageX, y1: event.pageY, x2: event.pageX, y2: event.pageY, mode: state.mode };
 			document.documentElement.style.setProperty('cursor', 'crosshair', 'important');
 			event.preventDefault();
 		}, true);
 		document.addEventListener('pointermove', (event) => {
-			if (!state.drawing) return;
+			if (!state.drawing || ['note', 'link'].includes(state.drawing.mode)) return;
 			state.drawing.x2 = event.pageX;
 			state.drawing.y2 = event.pageY;
 			const preview = { ...state.drawing, type: state.mode, color: state.color };
@@ -331,10 +389,28 @@
 		}, true);
 		document.addEventListener('pointerup', (event) => {
 			if (!state.drawing) return;
+			const { x1, y1, mode } = state.drawing;
+			if (mode === 'note' || mode === 'link') {
+				state.drawing = null;
+				document.documentElement.style.removeProperty('cursor');
+				if (mode === 'note') {
+					const text = state.panel.querySelector('[data-note-text]').value.trim();
+					if (!text) return setStatus('Saisissez le texte de l’annotation avant de la placer.');
+					state.annotations.push({ type: 'note', text, color: state.color, x1, y1 });
+				} else {
+					const url = safeLink(state.panel.querySelector('[data-link-url]').value.trim());
+					if (!url) return setStatus('Saisissez une adresse HTTP ou HTTPS valide.');
+					const label = state.panel.querySelector('[data-link-label]').value.trim() || 'Ouvrir le lien';
+					state.annotations.push({ type: 'link', href: url.href, label, color: state.color, x1, y1 });
+				}
+				saveAnnotations();
+				setStatus(mode === 'note' ? 'Annotation ajoutée et enregistrée.' : 'Lien ajouté et enregistré.');
+				return;
+			}
 			state.drawing.x2 = event.pageX;
 			state.drawing.y2 = event.pageY;
 			document.documentElement.style.removeProperty('cursor');
-			const { x1, y1, x2, y2 } = state.drawing;
+			const { x2, y2 } = state.drawing;
 			state.drawing = null;
 			if (Math.hypot(x2 - x1, y2 - y1) < 4) return renderAnnotations();
 			state.annotations.push({ type: state.mode, color: state.color, x1, y1, x2, y2 });
