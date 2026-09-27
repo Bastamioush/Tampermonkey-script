@@ -31,7 +31,7 @@ Dans le tableau de bord Tampermonkey, vérifiez que l'interrupteur du script est
 
 | Script | Utilité principale | Déclenchement |
 | --- | --- | --- |
-| `Explain-Userscript.js` | Simplifier un passage sélectionné avec une API compatible OpenAI | Sélectionner du texte, puis cliquer sur le bouton d'explication |
+| `Explain-Userscript.js` | Simplifier un passage sélectionné avec une API d'IA configurable | Sélectionner du texte, puis cliquer sur le bouton d'explication |
 | `quest-ce-que-cest.user.js` | Inspecter rapidement un élément HTML | Maintenir `Alt` et survoler un élément |
 | `Super-Copie.js` | Télécharger la page actuelle et certaines pages redirigées | Cliquer sur **Télécharger cette page** |
 | `Refus-Cookies.user.js` | Refuser les cookies non nécessaires et masquer certains bandeaux | Automatique au chargement de la page |
@@ -40,7 +40,7 @@ Dans le tableau de bord Tampermonkey, vérifiez que l'interrupteur du script est
 
 ### Utilité
 
-Ce script ajoute un bouton **Explain this** près du texte sélectionné. Il envoie le passage à une API compatible avec le format OpenAI Chat Completions et affiche une explication en français simple.
+Ce script ajoute un bouton **Explain this** près du texte sélectionné. Il envoie le passage au fournisseur d'IA configuré et affiche une explication en français simple. Les formats OpenAI-compatible, Anthropic Messages et Google Gemini sont pris en charge.
 
 Il est utile pour comprendre rapidement un texte technique, administratif ou difficile, sans quitter la page consultée.
 
@@ -48,7 +48,7 @@ Il est utile pour comprendre rapidement un texte technique, administratif ou dif
 
 1. Sélectionnez un passage avec la souris.
 2. Cliquez sur le bouton **Explain this** qui apparaît sous la sélection.
-3. Lors de la première utilisation, saisissez votre clé API OpenAI.
+3. Lors de la première utilisation, configurez le format, l'endpoint, le modèle et la clé API.
 4. L'explication apparaît dans un panneau en haut à droite.
 5. Appuyez sur **Fermer** ou sur `Échap` pour masquer le panneau.
 
@@ -57,31 +57,29 @@ Il est utile pour comprendre rapidement un texte technique, administratif ou dif
 1. Au chargement de la page, le script crée un bouton caché et un panneau de résultat.
 2. Les événements `mouseup` et `keyup` permettent de détecter une nouvelle sélection de texte.
 3. Le texte est nettoyé des espaces superflus, puis mémorisé.
-4. La clé API est enregistrée dans le `localStorage` du site sous la clé `__explain_this_config__`.
-5. Le script envoie une requête `POST` à `https://api.openai.com/v1/chat/completions` avec le modèle `gpt-4o-mini` par défaut.
+4. La configuration est enregistrée dans le `localStorage` du site sous la clé `__explain_this_config__`. Le bouton **Configurer l’API** permet de la modifier.
+5. Le script envoie une requête au endpoint et au modèle configurés, avec le format correspondant au fournisseur choisi.
 6. La réponse reçue est échappée avant son affichage afin que le texte retourné ne puisse pas être interprété comme du HTML.
 7. Les erreurs HTTP, les réponses invalides et les erreurs réseau sont affichées dans le panneau.
 
 ### Autorisations et sécurité
 
-- `GM_xmlhttpRequest` autorise la requête vers l'API même si elle est sur un autre domaine.
-- `@connect api.openai.com` autorise l'API OpenAI. `localhost` et `127.0.0.1` sont également prévus pour un endpoint local.
+- `GM_xmlhttpRequest` autorise la requête vers l'API même si elle est sur un autre domaine. `@connect *` permet de configurer des fournisseurs hébergés sur différents domaines ; Tampermonkey peut demander de confirmer cette autorisation.
 - La clé API est conservée dans le navigateur et envoyée avec chaque requête. Ne partagez pas votre profil de navigateur et ne publiez jamais cette clé sur GitHub.
 - Le texte sélectionné est envoyé au endpoint configuré. Évitez de sélectionner des informations confidentielles.
+- Les API n'ayant pas toutes le même protocole, un endpoint personnalisé doit être compatible OpenAI Chat Completions, Anthropic Messages ou Gemini `generateContent`. Une clé seule ne suffit pas pour utiliser un protocole non pris en charge.
 
 ### Configuration
 
-La configuration par défaut se trouve au début du script :
+La configuration se fait depuis **Configurer l’API**, dans le panneau d'explication. Choisissez le format du fournisseur, puis saisissez l'endpoint, le nom exact du modèle et la clé fournie par ce service. Les valeurs proposées par défaut sont :
 
-```js
-const defaultConfig = {
-    endpoint: 'https://api.openai.com/v1/chat/completions',
-    model: 'gpt-4o-mini',
-    apiKey: ''
-};
-```
+| Format | Exemples | Endpoint par défaut |
+| --- | --- | --- |
+| OpenAI-compatible | OpenAI, OpenRouter, Groq, Ollama et autres services compatibles | `https://api.openai.com/v1/chat/completions` |
+| Anthropic | Claude | `https://api.anthropic.com/v1/messages` |
+| Gemini | Google AI | `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent` |
 
-Pour utiliser un service compatible OpenAI ou un serveur local, modifiez `endpoint` et `model`, puis supprimez éventuellement la configuration enregistrée dans le `localStorage` du site afin de repartir de zéro.
+Pour un serveur local ou un autre fournisseur compatible, remplacez l'endpoint et le modèle dans le formulaire. La permission réseau `@connect *` est nécessaire pour laisser l'utilisateur choisir librement un domaine d'API.
 
 ## quest-ce-que-cest.user.js
 
@@ -197,8 +195,7 @@ Les permissions sont déclarées dans l'en-tête de chaque script avec les direc
 | `GM_xmlhttpRequest` | `Explain-Userscript.js`, `Super-Copie.js` | Envoyer des requêtes vers des domaines externes |
 | `GM_download` | `Super-Copie.js` | Enregistrer les pages téléchargées |
 | `GM_getResourceURL` | `Super-Copie.js` | Charger le logo du bouton |
-| `@connect api.openai.com` | `Explain-Userscript.js` | Autoriser l'API OpenAI |
-| `@connect localhost`, `127.0.0.1` | `Explain-Userscript.js` | Autoriser un service local compatible |
+| `@connect *` | `Explain-Userscript.js` | Autoriser le domaine du fournisseur d'IA configuré |
 | `@connect *` | `Super-Copie.js` | Autoriser la vérification de liens sur différents domaines |
 | `@grant none` | `quest-ce-que-cest.user.js`, `Refus-Cookies.user.js` | Utiliser uniquement les API normales du navigateur |
 
